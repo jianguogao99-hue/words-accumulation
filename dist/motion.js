@@ -27,13 +27,27 @@ function strandProfile(u,t,strand,mobile){
  const openness=.5+.5*Math.sin(fold);
  return {width:(mobile?47:72)*(.15+.85*openness),openness};
 }
+// Cover the viewport's bounding circle even at maximum drift, minimum scale,
+// and any rotation. Include the full ribbon width and longitudinal modulation.
+function helixCoverage(width,height){
+ const axisLength=Math.hypot(width*.7,height*1.2);
+ const radius=width<801?width*.18:Math.min(width*.15,160);
+ const ribbonWidth=width<801?47:72;
+ const viewportReach=Math.hypot(width,height)*.5+Math.hypot(width*.34,height*.22);
+ const offsetReach=width*.07+radius+ribbonWidth*1.5+80;
+ const half=Math.max(.5,(viewportReach/.92+offsetReach)/axisLength+.021);
+ return {min:.5-half,span:half*2};
+}
 function drawOcean(t){
  ocean.clearRect(0,0,oceanWidth,oceanHeight);
- const mobile=oceanWidth<801,count=mobile?1800:2600,points=[];
+ const mobile=oceanWidth<801,coverage=helixCoverage(oceanWidth,oceanHeight);
+ // Extend the number of samples with length, so coverage never thins the ribbon.
+ const count=Math.ceil((mobile?1800:2600)*coverage.span),points=[];
  const floating=helixFloat(t,oceanWidth,oceanHeight);
  const driftX=floating.x,driftY=floating.y,cosTilt=Math.cos(floating.tilt),sinTilt=Math.sin(floating.tilt),breath=floating.scale;
  for(let i=0;i<count;i++){
-  const p=ribbonParticles[i],travel=(p.u+t*.018*p.speed)%1;
+  const p=ribbonParticles[i%ribbonParticles.length],tile=Math.floor(i/ribbonParticles.length);
+  const travel=coverage.min+((p.u+tile*.61803398875+t*.018*p.speed)%1)*coverage.span;
   for(let strand=0;strand<2;strand++){
    // Nonuniform longitudinal spacing creates traveling pockets of density.
    const u=travel+.021*Math.sin(travel*Math.PI*6-t*.32+strand*1.8);
@@ -50,6 +64,8 @@ function drawOcean(t){
    const localX=(x-oceanWidth*.5)*breath,localY=(y-oceanHeight*.5)*breath;
    x=oceanWidth*.5+localX*cosTilt-localY*sinTilt+driftX;
    y=oceanHeight*.5+localX*sinTilt+localY*cosTilt+driftY;
+   // Keep the extended ends out of the draw/sort budget while retaining nearby ripples.
+   if(x < -60 || x > oceanWidth+60 || y < -60 || y > oceanHeight+60)continue;
    let light=0;
    for(const ripple of ripples){const age=t-ripple.time;if(age<0||age>2.8)continue;const dx=x-ripple.x,dy=y-ripple.y,d=Math.hypot(dx,dy),force=Math.exp(-Math.pow((d-age*180)/42,2))*(1-age/2.8);x+=dx/Math.max(d,1)*force*20;y+=dy/Math.max(d,1)*force*20;light+=force*.25;}
    if(pointer){const dx=x-pointer.x,dy=y-pointer.y,d=Math.hypot(dx,dy);if(d<100){const force=(1-d/100)*10;x+=dx/Math.max(d,1)*force;y+=dy/Math.max(d,1)*force;}}
