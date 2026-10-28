@@ -1,5 +1,19 @@
 // Reorder only visible entries; hidden words keep their slots. Persist by word identity.
-let reorderMode=false,wordDrag=null;
+let reorderMode=false,wordDrag=null,lastReorderHaptic=-Infinity;
+function reorderHaptic(duration=6){
+ const now=performance.now();if(now-lastReorderHaptic<85||typeof navigator.vibrate!=='function')return;
+ try{navigator.vibrate(duration);lastReorderHaptic=now}catch{}
+}
+function lockReorderScroll(){
+ const scroll={x:window.scrollX,y:window.scrollY};
+ document.body.style.setProperty('--reorder-scroll-top',`${-scroll.y}px`);
+ document.documentElement.classList.add('reorder-scroll-locked');document.body.classList.add('reorder-scroll-locked');
+ return scroll;
+}
+function unlockReorderScroll(scroll){
+ document.documentElement.classList.remove('reorder-scroll-locked');document.body.classList.remove('reorder-scroll-locked');document.body.style.removeProperty('--reorder-scroll-top');
+ window.scrollTo(scroll.x,scroll.y);
+}
 const reorderButton=document.querySelector('#reorder');
 const reorderStatus=document.createElement('p');reorderStatus.id='reorder-status';reorderStatus.className='reorder-status';reorderStatus.setAttribute('role','status');reorderStatus.setAttribute('aria-live','polite');reorderStatus.hidden=true;document.querySelector('.tools').before(reorderStatus);
 function syncReorder(){
@@ -21,16 +35,22 @@ function positionWordDrag(){
  drag.ghost.style.top=`${drag.y-drag.offset}px`;
  const other=[...document.querySelectorAll('#rows > tr')].filter(r=>r!==drag.row);
  const next=other.find(r=>{const box=r.getBoundingClientRect();return drag.y<box.top+box.height/2});
- if(next)document.querySelector('#rows').insertBefore(drag.row,next);else document.querySelector('#rows').append(drag.row);
+ if(drag.row.nextElementSibling!==next){
+  if(next)document.querySelector('#rows').insertBefore(drag.row,next);else document.querySelector('#rows').append(drag.row);
+  reorderHaptic();
+ }
 }
-function wordDragFrame(){const drag=wordDrag;if(!drag)return;const edge=85;const speed=drag.y<edge?-Math.min(15,(edge-drag.y)/5):drag.y>innerHeight-edge?Math.min(15,(drag.y-innerHeight+edge)/5):0;if(speed){window.scrollBy(0,speed);positionWordDrag()}drag.frame=requestAnimationFrame(wordDragFrame);}
 function beginWordDrag(event,row,handle){
  if(event.button!==0||wordDrag)return;event.preventDefault();event.stopPropagation();
  const rect=row.getBoundingClientRect(),ghost=document.createElement('div');ghost.className='reorder-ghost';ghost.style.left=`${rect.left}px`;ghost.style.width=`${rect.width}px`;const title=document.createElement('strong');title.textContent=row.dataset.word;const summary=document.createElement('span');summary.textContent=words.find(w=>w.word===row.dataset.word)?.summary||'';ghost.append(title,summary);document.body.append(ghost);
- wordDrag={row,handle,ghost,id:event.pointerId,y:event.clientY,offset:Math.min(event.clientY-rect.top,45),frame:0};row.classList.add('reorder-placeholder');document.body.classList.add('word-dragging');handle.setPointerCapture(event.pointerId);positionWordDrag();wordDrag.frame=requestAnimationFrame(wordDragFrame);
+ const scroll=lockReorderScroll();wordDrag={row,handle,ghost,id:event.pointerId,y:event.clientY,offset:Math.min(event.clientY-rect.top,45),scroll};row.classList.add('reorder-placeholder');document.body.classList.add('word-dragging');handle.setPointerCapture(event.pointerId);reorderHaptic(9);positionWordDrag();
 }
 window.addEventListener('pointermove',event=>{if(!wordDrag||event.pointerId!==wordDrag.id)return;event.preventDefault();wordDrag.y=event.clientY;positionWordDrag();},{passive:false});
-function finishWordDrag(event,cancelled=false){const drag=wordDrag;if(!drag||event.pointerId!==drag.id)return;wordDrag=null;cancelAnimationFrame(drag.frame);drag.ghost.remove();drag.row.classList.remove('reorder-placeholder');document.body.classList.remove('word-dragging');if(drag.handle.hasPointerCapture(drag.id))drag.handle.releasePointerCapture(drag.id);if(!cancelled)saveVisibleOrder();render();focusHandle(drag.row.dataset.word);if(!cancelled)reorderStatus.textContent='Order saved on this device.';}
+function finishWordDrag(event,cancelled=false){const drag=wordDrag;if(!drag||event.pointerId!==drag.id)return;wordDrag=null;drag.ghost.remove();drag.row.classList.remove('reorder-placeholder');document.body.classList.remove('word-dragging');if(drag.handle.hasPointerCapture(drag.id))drag.handle.releasePointerCapture(drag.id);if(!cancelled)saveVisibleOrder();render();unlockReorderScroll(drag.scroll);focusHandle(drag.row.dataset.word);if(!cancelled)reorderStatus.textContent='Order saved on this device.';}
+// iOS can still synthesize page panning from touch; block it only during an active drag.
+window.addEventListener('touchmove',event=>{if(wordDrag&&event.cancelable)event.preventDefault()},{passive:false});
+window.addEventListener('wheel',event=>{if(wordDrag&&event.cancelable)event.preventDefault()},{passive:false});
+window.addEventListener('blur',()=>{if(wordDrag)finishWordDrag({pointerId:wordDrag.id},true)});
 window.addEventListener('pointerup',event=>finishWordDrag(event));window.addEventListener('pointercancel',event=>finishWordDrag(event,true));
 reorderButton.onclick=()=>{if(wordDrag)return;reorderMode=!reorderMode;render();};
 // Filter changes rerender the list. A drag is cancelled before changing its visible subset.

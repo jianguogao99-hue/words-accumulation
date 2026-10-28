@@ -13,3 +13,5 @@ This GitHub repository is the sole source of truth. Before modifying, read the l
 - Do not commit .netlify or credentials.
 
 - Custom word ordering is browser-local in `wordbook-v1.order`. Preserve this schema and append newly published seed words after the saved order; do not overwrite users’ ordering when adding vocabulary.
+
+- User preference (2026-10-28): UI fixes are local-only by default. Do not commit/push to GitHub or publish to Netlify unless the user explicitly requests that update/publication. This overrides the publication step above.
