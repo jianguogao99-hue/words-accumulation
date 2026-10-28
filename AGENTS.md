@@ -11,3 +11,5 @@ This GitHub repository is the sole source of truth. Before modifying, read the l
 - Commit to main; Netlify project jianguo-wordslist-129830 must deploy that commit successfully before reporting publication.
 - Do not update the former ChatGPT Sites source as a second source of truth.
 - Do not commit .netlify or credentials.
+
+- Custom word ordering is browser-local in `wordbook-v1.order`. Preserve this schema and append newly published seed words after the saved order; do not overwrite users’ ordering when adding vocabulary.
