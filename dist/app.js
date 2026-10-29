@@ -1,5 +1,5 @@
 let pronunciationAudio=null,pronunciationTimer=null,pronunciationId=0;
-const bundledAudio=new Set(['apprentice','arbitrary','apprehension','specify','property','configure','inherit','descend','heredity','heritage','thorn','warrant','embolden','outrage','turmoil','ambivalent','interrogate','eradicate']);
+const bundledAudio=new Set(['impart','apprentice','arbitrary','apprehension','specify','property','configure','inherit','descend','heredity','heritage','thorn','warrant','embolden','outrage','turmoil','ambivalent','interrogate','eradicate']);
 function stopPronunciation(){pronunciationId++;clearTimeout(pronunciationTimer);if(pronunciationAudio){pronunciationAudio.pause();pronunciationAudio=null;}if('speechSynthesis' in window)window.speechSynthesis.cancel();document.querySelectorAll('.pronunciation-button').forEach(b=>b.setAttribute('aria-busy','false'));}
 function playPronunciation(word,accent='uk'){
  stopPronunciation();const id=pronunciationId,locale=accent==='us'?'en-US':'en-GB',label=accent==='us'?'US':'UK';
